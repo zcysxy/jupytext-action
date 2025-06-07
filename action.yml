@@ -1,4 +1,4 @@
-name: "jupytext-action"
+name: "Jupytext Action"
 author: zcysxy
 description: "Convert between Jupyter notebooks and text formats using jupytext"
 
@@ -6,16 +6,15 @@ inputs:
   github_token:
     description: "GitHub token"
     required: true
-    default: ${{ github.token }}
 
   input_format:
-    description: "Input format (e.g., md, py, ipynb)"
-    required: false
+    description: "Input format (py, markdown, notebook, etc.)"
+    required: true
     default: "md"
 
   output_format:
-    description: "Output format (e.g., ipynb, py, md)"
-    required: false
+    description: "Output format (py, markdown, notebook, etc.)"
+    required: true
     default: "ipynb"
 
   input_directory:
@@ -24,51 +23,46 @@ inputs:
     default: "./"
 
   output_dir:
-    description: "Output directory for converted files"
+    description: "Directory to store output files"
     required: false
     default: "./jupyter/"
 
   check:
-    description: "Which files to check: 'all', 'latest', or 'frontmatter'"
+    description: "Mode to check files (all, latest, frontmatter)"
     required: false
     default: "frontmatter"
 
   frontmatter_field:
-    description: "Frontmatter field name to check when using frontmatter check mode"
+    description: "Field in frontmatter to check (for check=frontmatter)"
     required: false
     default: "notebook"
 
-  frontmatter_value:
-    description: "Value in frontmatter field that indicates conversion (for check=frontmatter)"
-    required: false
-    default: "true"
-
-  disable_git_commit:
-    description: "Disable Git commit after conversion (useful for GitHub releases)"
-    required: false
-    default: "false"
-
   comment_magics:
-    description: "Whether to comment magic commands"
+    description: "Comment out Jupyter magic commands"
     required: false
     default: "false"
 
   split_at_heading:
-    description: "Whether to split at headings"
+    description: "Split markdown at heading"
     required: false
     default: "false"
 
   sync_mode:
-    description: "Sync mode: 'one-way' or 'two-way'"
+    description: "Sync mode (one-way, two-way)"
     required: false
     default: "one-way"
 
+  commit_message:
+    description: "Commit message for the auto-generated commit"
+    required: false
+    default: "Convert files using jupytext"
+
   target_repository:
-    description: "Target repository"
+    description: "Target repository to push to"
     required: false
 
   target_branch:
-    description: "Target branch"
+    description: "Target branch to push to"
     required: false
 
   pull_request_repository:
@@ -79,10 +73,10 @@ inputs:
     description: "Pull request branch"
     required: false
 
-  commit_message:
-    description: "Commit message"
+  disable_git_commit:
+    description: "Disable git commit (only convert files)"
     required: false
-    default: ""
+    default: "false"
 
 runs:
   using: "docker"

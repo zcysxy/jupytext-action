@@ -145,8 +145,16 @@ def get_files_with_frontmatter() -> List[str]:
             if frontmatter_match:
                 frontmatter_text = frontmatter_match.group(1)
                 try:
-                    # Parse the YAML frontmatter
-                    frontmatter = yaml.safe_load(frontmatter_text)
+                    # First try parsing as JSON (for {"author": "me"} style)
+                    try:
+                        if frontmatter_text.strip().startswith('{') and frontmatter_text.strip().endswith('}'):
+                            frontmatter = json.loads(frontmatter_text)
+                        else:
+                            # Parse the standard YAML frontmatter
+                            frontmatter = yaml.safe_load(frontmatter_text)
+                    except json.JSONDecodeError:
+                        # If JSON parsing fails, fall back to YAML
+                        frontmatter = yaml.safe_load(frontmatter_text)
                     
                     # Check if the specified frontmatter field has the specified value
                     if frontmatter and isinstance(frontmatter, dict):
@@ -154,17 +162,18 @@ def get_files_with_frontmatter() -> List[str]:
                         
                         # Convert expected value to appropriate type for comparison
                         expected_value = FRONTMATTER_VALUE
-                        if expected_value.lower() == 'true':
-                            expected_value = True
-                        elif expected_value.lower() == 'false':
-                            expected_value = False
-                        elif expected_value.isdigit():
-                            expected_value = int(expected_value)
+                        if isinstance(expected_value, str):
+                            if expected_value.lower() == 'true':
+                                expected_value = True
+                            elif expected_value.lower() == 'false':
+                                expected_value = False
+                            elif expected_value.isdigit():
+                                expected_value = int(expected_value)
                         
                         if field_value == expected_value:
                             files_to_convert.append(file_path)
-                except yaml.YAMLError:
-                    print(f"Error parsing frontmatter in {file_path}")
+                except (yaml.YAMLError, json.JSONDecodeError) as e:
+                    print(f"Error parsing frontmatter in {file_path}: {e}")
         except Exception as e:
             print(f"Error processing {file_path}: {e}")
     
