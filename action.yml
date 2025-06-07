@@ -2,15 +2,19 @@ name: "autopy-lot"
 author: deep5050
 description: "Converts Jupyter Notebooks to python, Markdown ,rmarkdown and lot more !"
 
+env:
+  GITHUB_ACTOR: ${{ github.actor }}
+  GITHUB_USER_ID: ${{ github.actor_id }} 
+
 inputs:
   github_token:
     description: "GITHUB_TOKEN secret < automatically provided by Github , you don't need to set up >"
     required: true
 
   check:
-    description: "Which files to check: all or just committed: all | latest"
-    default: "all"
-    required: false
+    description: "Which files to check: 'all' (all files), 'latest' (just committed files), or 'frontmatter' (Markdown files with notebook: true in frontmatter)"
+    required: true
+    default: "frontmatter"
 
   input_type:
     description: "File types to be converted : py | ipynb | r "
