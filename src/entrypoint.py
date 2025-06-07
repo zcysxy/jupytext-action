@@ -120,11 +120,21 @@ def get_files_with_frontmatter() -> List[str]:
         print("Frontmatter check is only available for Markdown files.")
         return []
     
-    search_pattern = os.path.join(INPUT_DIRECTORY, f'**/*.{INPUT_EXT}')
-    all_md_files = list(iglob(search_pattern, recursive=True))
+    # First, get all modified files
+    cmd = 'git diff-tree --no-commit-id --name-only -r HEAD'
+    committed_files = sp.getoutput(cmd).split('\n')
+    
+    # Filter for markdown files in the input directory
+    input_dir_path = os.path.normpath(INPUT_DIRECTORY)
+    modified_md_files = [file for file in committed_files if (
+        file.endswith(f'.{INPUT_EXT}') and 
+        os.path.isfile(file) and
+        (INPUT_DIRECTORY == './' or file.startswith(input_dir_path))
+    )]
+    
     files_to_convert = []
     
-    for file_path in all_md_files:
+    for file_path in modified_md_files:
         try:
             with open(file_path, 'r') as f:
                 content = f.read()
