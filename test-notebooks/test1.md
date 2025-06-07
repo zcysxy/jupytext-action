@@ -9,12 +9,13 @@ jupyter:
   kernelspec:
     display_name: Python 3
     name: python3
-notebook: false
+notebook: true
+type: jupyter
 ---
 
-# Hello world
+# Hello World
 
 ```python
-print("Hello world")
+print("Hello World")
 ```
 

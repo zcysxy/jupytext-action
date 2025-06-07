@@ -3,12 +3,17 @@ on: [push]
 
 jobs:
   build:
-    name: autopy-lot-md
+    name: jupytext-action
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - name: autopy-lot 
-        uses: deep5050/autopy-lot@master
+      - uses: actions/checkout@v3
+      - name: Test Jupytext Action 
+        uses: zcysxy/jupytext-action@main
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN}}
-          output_type: markdown
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          input_directory: "test-notebooks"
+          input_format: md
+          output_format: ipynb
+          disable_git_commit: false
+          frontmatter_field: type
+          frontmatter_value: jupyter

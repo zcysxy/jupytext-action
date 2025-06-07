@@ -18,6 +18,11 @@ inputs:
     required: false
     default: "ipynb"
 
+  input_directory:
+    description: "Directory containing input files to convert"
+    required: false
+    default: "./"
+
   output_dir:
     description: "Output directory for converted files"
     required: false
@@ -32,6 +37,11 @@ inputs:
     description: "Frontmatter field name to check when using frontmatter check mode"
     required: false
     default: "notebook"
+
+  frontmatter_value:
+    description: "Value in frontmatter field that indicates conversion (for check=frontmatter)"
+    required: false
+    default: "true"
 
   disable_git_commit:
     description: "Disable Git commit after conversion (useful for GitHub releases)"

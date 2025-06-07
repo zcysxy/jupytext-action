@@ -34,7 +34,9 @@ COMMENT_MAGICS = os.environ.get('INPUT_COMMENT_MAGICS', '') or 'false' # 'true' 
 SPLIT_AT_HEADING = os.environ.get('INPUT_SPLIT_AT_HEADING', '') or 'false'  # 'true' | 'false'
 SYNC_MODE = os.environ['INPUT_SYNC_MODE'] or 'one-way'  # 'one-way' | 'two-way'
 FRONTMATTER_FIELD = os.environ.get('INPUT_FRONTMATTER_FIELD', '') or 'notebook'  # Field name in frontmatter to check
+FRONTMATTER_VALUE = os.environ.get('INPUT_FRONTMATTER_VALUE', '') or 'true'  # Value in frontmatter field that indicates conversion
 DISABLE_GIT_COMMIT = os.environ.get('INPUT_DISABLE_GIT_COMMIT', '') or 'false'  # Whether to disable Git commit
+INPUT_DIRECTORY = os.environ.get('INPUT_INPUT_DIRECTORY', '') or './'  # Directory containing input files
 
 # Format specifications
 INPUT_FORMAT = os.environ['INPUT_INPUT_FORMAT'] or 'md'  # ipynb, py, md, R, etc.
@@ -90,27 +92,36 @@ def prepare_command(input_file: str, output_file: str) -> str:
 
 
 def get_all_files() -> List[str]:
-    """Get list of all input files in this repo."""
-    files = list(iglob(f'**/*.{INPUT_EXT}', recursive=True))
+    """Get list of all input files in the specified directory."""
+    search_pattern = os.path.join(INPUT_DIRECTORY, f'**/*.{INPUT_EXT}')
+    files = list(iglob(search_pattern, recursive=True))
     return files
 
 
 def get_modified_files() -> List[str]:
-    """Get list of modified files in the current commit."""
+    """Get list of modified files in the current commit within the input directory."""
     cmd = 'git diff-tree --no-commit-id --name-only -r HEAD'
     committed_files = sp.getoutput(cmd).split('\n')
+    
+    # Filter files that are in the input directory, have the correct extension, and exist
+    input_dir_path = os.path.normpath(INPUT_DIRECTORY)
     files = [file for file in committed_files if (
-        file.endswith(f'.{INPUT_EXT}') and os.path.isfile(file))]
+        file.endswith(f'.{INPUT_EXT}') and 
+        os.path.isfile(file) and
+        (INPUT_DIRECTORY == './' or file.startswith(input_dir_path))
+    )]
+    
     return files
 
 
 def get_files_with_frontmatter() -> List[str]:
-    """Get list of Markdown files that have the specified frontmatter field set to true."""
+    """Get list of Markdown files in the input directory that have the specified frontmatter field with the specified value."""
     if INPUT_FORMAT.lower() != 'md' and INPUT_FORMAT.lower() != 'markdown':
         print("Frontmatter check is only available for Markdown files.")
         return []
-        
-    all_md_files = list(iglob(f'**/*.{INPUT_EXT}', recursive=True))
+    
+    search_pattern = os.path.join(INPUT_DIRECTORY, f'**/*.{INPUT_EXT}')
+    all_md_files = list(iglob(search_pattern, recursive=True))
     files_to_convert = []
     
     for file_path in all_md_files:
@@ -126,9 +137,22 @@ def get_files_with_frontmatter() -> List[str]:
                 try:
                     # Parse the YAML frontmatter
                     frontmatter = yaml.safe_load(frontmatter_text)
-                    # Check if the specified frontmatter field is true
-                    if frontmatter and isinstance(frontmatter, dict) and frontmatter.get(FRONTMATTER_FIELD) is True:
-                        files_to_convert.append(file_path)
+                    
+                    # Check if the specified frontmatter field has the specified value
+                    if frontmatter and isinstance(frontmatter, dict):
+                        field_value = frontmatter.get(FRONTMATTER_FIELD)
+                        
+                        # Convert expected value to appropriate type for comparison
+                        expected_value = FRONTMATTER_VALUE
+                        if expected_value.lower() == 'true':
+                            expected_value = True
+                        elif expected_value.lower() == 'false':
+                            expected_value = False
+                        elif expected_value.isdigit():
+                            expected_value = int(expected_value)
+                        
+                        if field_value == expected_value:
+                            files_to_convert.append(file_path)
                 except yaml.YAMLError:
                     print(f"Error parsing frontmatter in {file_path}")
         except Exception as e:
@@ -143,6 +167,9 @@ def convert_files(files: List[str]) -> List[str]:
     for input_file in files:
         # Create output directory if it doesn't exist
         input_dir, input_name = os.path.split(input_file)
+        # Strip INPUT_DIRECTORY from input_dir if it is set
+        if INPUT_DIRECTORY and INPUT_DIRECTORY != './':
+            input_dir = os.path.relpath(input_dir, INPUT_DIRECTORY)
         output_dir = os.path.join(OUTPUT_DIR, input_dir) if OUTPUT_DIR != './' else input_dir
         
         if not os.path.exists(output_dir) and output_dir:
@@ -196,25 +223,36 @@ def commit_changes(files: List[str]):
         print("No files to commit")
         return
         
-    # Configure git
-    set_email = f'git config --local user.email "{GITHUB_ACTOR}@users.noreply.github.com"'
-    set_user = f'git config --local user.name "{GITHUB_ACTOR}"'
+    # Configure git - fix for workspace ownership issues
+    sp.call('git config --global --add safe.directory /github/workspace', shell=True)
+    
+    # Configure git with actor info - use --global instead of --local
+    set_email = f'git config --global user.email "{GITHUB_ACTOR}@users.noreply.github.com"'
+    set_user = f'git config --global user.name "{GITHUB_ACTOR}"'
     sp.call(set_email, shell=True)
     sp.call(set_user, shell=True)
     
     # Prepare file list (deduplicate using set)
     file_list = ' '.join(set(files))
     
-    # Commit changes
-    git_checkout = f'git checkout {TARGET_BRANCH}'
+    # Commit changes - remove the checkout command as it might cause issues
     git_add = f'git add {file_list}'
     git_commit = f'git commit -m "{COMMIT_MESSAGE}"'
     
     print(f'Committing {file_list}...')
     
-    sp.call(git_checkout, shell=True)
-    sp.call(git_add, shell=True)
-    sp.call(git_commit, shell=True)
+    try:
+        sp.check_call(git_add, shell=True)
+        # Use try/except to handle case where there might be nothing to commit
+        try:
+            sp.check_call(git_commit, shell=True)
+            return True
+        except sp.CalledProcessError:
+            print("Nothing to commit - files may be unchanged")
+            return False
+    except sp.CalledProcessError as e:
+        print(f"Git operation failed: {e}")
+        return False
 
 
 def push_changes():
