@@ -37,6 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # important when using check options 'frontmatter' or 'latest'
       - name: Convert Markdown to Notebooks
         uses: zcysxy/jupytext-action@v1
         with:
@@ -48,3 +50,8 @@ jobs:
 ```
 
 Please refer to `action.yml` for all input options.
+
+## Notes
+
+- checkout depth >= 2 when using check options 'frontmatter' or 'latest'.
+- Give Actions the permission to write.
