@@ -1,71 +1,78 @@
-name: "autopy-lot"
-author: deep5050
-description: "Converts Jupyter Notebooks to python, Markdown ,rmarkdown and lot more !"
-
-env:
-  GITHUB_ACTOR: ${{ github.actor }}
-  GITHUB_USER_ID: ${{ github.actor_id }} 
+name: "jupytext-action"
+author: zcysxy
+description: "Convert between Jupyter notebooks and text formats using jupytext"
 
 inputs:
   github_token:
-    description: "GITHUB_TOKEN secret < automatically provided by Github , you don't need to set up >"
+    description: "GitHub token"
     required: true
+    default: ${{ github.token }}
 
-  check:
-    description: "Which files to check: 'all' (all files), 'latest' (just committed files), or 'frontmatter' (Markdown files with notebook: true in frontmatter)"
-    required: true
-    default: "frontmatter"
+  input_format:
+    description: "Input format (e.g., md, py, ipynb)"
+    required: false
+    default: "md"
 
-  input_type:
-    description: "File types to be converted : py | ipynb | r "
+  output_format:
+    description: "Output format (e.g., ipynb, py, md)"
+    required: false
     default: "ipynb"
-    required: false
-
-  comment_magics:
-    description: "--opt comment_magics <see documentation> : false (default) | true "
-    default: ""
-    required: false
-
-  split_at_heading:
-    description: "--opt split_at_heading <see documentation> :false (default) | true"
-    default: ""
-    required: false
-
-  output_type:
-    description: "Target output type: py | markdown | rmarkdown | r | ipynb"
-    default: "py"
-    required: false
 
   output_dir:
-    description: "Output directory"
-    default: './autopy-lot/'
-    required: true
-
-
-  target_branch:
-    description: "Branch that the badge will target. Defaults to the current branch."
-    default: ""
+    description: "Output directory for converted files"
     required: false
+    default: "./jupyter/"
 
-  pull_request_branch:
-    description: "Branch that the badge will target on pull_request. Defaults to GITHUB_BASE_REF."
-    default: ""
+  check:
+    description: "Which files to check: 'all', 'latest', or 'frontmatter'"
     required: false
+    default: "frontmatter"
+
+  frontmatter_field:
+    description: "Frontmatter field name to check when using frontmatter check mode"
+    required: false
+    default: "notebook"
+
+  comment_magics:
+    description: "Whether to comment magic commands"
+    required: false
+    default: "false"
+
+  split_at_heading:
+    description: "Whether to split at headings"
+    required: false
+    default: "false"
+
+  sync_mode:
+    description: "Sync mode: 'one-way' or 'two-way'"
+    required: false
+    default: "one-way"
 
   target_repository:
-    description: "Repository that the badge will target. Defaults to the current repository."
-    default: ""
+    description: "Target repository"
+    required: false
+
+  target_branch:
+    description: "Target branch"
     required: false
 
   pull_request_repository:
-    description: "Repository that the badge will target on pull_request. Defaults to TARGET_REPOSITORY"
-    default: ""
+    description: "Pull request repository"
     required: false
+
+  pull_request_branch:
+    description: "Pull request branch"
+    required: false
+
+  commit_message:
+    description: "Commit message"
+    required: false
+    default: ""
 
 runs:
   using: "docker"
   image: "Dockerfile"
 
 branding:
-  icon: "refresh-cw"
-  color: "black"
+  icon: "book"
+  color: "blue"

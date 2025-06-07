@@ -25,20 +25,20 @@ PULL_REQUEST_BRANCH = os.environ['INPUT_PULL_REQUEST_BRANCH'] or GITHUB_BASE_REF
 BRANCH = PULL_REQUEST_BRANCH if GITHUB_EVENT_NAME == 'pull_request' else TARGET_BRANCH
 
 GITHUB_ACTOR = os.environ['GITHUB_ACTOR']
-GITHUB_USER_ID = os.environ['GITHUB_USER_ID']
 GITHUB_REPOSITORY_OWNER = os.environ['GITHUB_REPOSITORY_OWNER']
 GITHUB_TOKEN = os.environ['INPUT_GITHUB_TOKEN']
 
 # Command related inputs
-CHECK = os.environ['INPUT_CHECK']  # 'all' | 'latest'
-COMMENT_MAGICS = os.environ['INPUT_COMMENT_MAGICS']  # 'true' | 'false'
-SPLIT_AT_HEADING = os.environ['INPUT_SPLIT_AT_HEADING']  # 'true' | 'false'
+CHECK = os.environ.get('INPUT_CHECK', 'frontmatter')  # 'all' | 'latest'
+COMMENT_MAGICS = os.environ.get('INPUT_COMMENT_MAGICS', '') or 'false' # 'true' | 'false'
+SPLIT_AT_HEADING = os.environ.get('INPUT_SPLIT_AT_HEADING', '') or 'false'  # 'true' | 'false'
 SYNC_MODE = os.environ['INPUT_SYNC_MODE'] or 'one-way'  # 'one-way' | 'two-way'
+FRONTMATTER_FIELD = os.environ.get('INPUT_FRONTMATTER_FIELD', '') or 'notebook'  # Field name in frontmatter to check
 
 # Format specifications
 INPUT_FORMAT = os.environ['INPUT_INPUT_FORMAT'] or 'md'  # ipynb, py, md, R, etc.
 OUTPUT_FORMAT = os.environ['INPUT_OUTPUT_FORMAT'] or 'ipynb'  # ipynb, py, md, R, etc.
-OUTPUT_DIR = os.environ['INPUT_OUTPUT_DIR'] or './'
+OUTPUT_DIR = os.environ['INPUT_OUTPUT_DIR'] or './jupyter/'
 
 # Mapping of format names to file extensions
 FORMAT_TO_EXT = {
@@ -104,7 +104,7 @@ def get_modified_files() -> List[str]:
 
 
 def get_files_with_frontmatter() -> List[str]:
-    """Get list of Markdown files that have notebook: true in their frontmatter."""
+    """Get list of Markdown files that have the specified frontmatter field set to true."""
     if INPUT_FORMAT.lower() != 'md' and INPUT_FORMAT.lower() != 'markdown':
         print("Frontmatter check is only available for Markdown files.")
         return []
@@ -125,8 +125,8 @@ def get_files_with_frontmatter() -> List[str]:
                 try:
                     # Parse the YAML frontmatter
                     frontmatter = yaml.safe_load(frontmatter_text)
-                    # Check if the notebook field is true
-                    if frontmatter and isinstance(frontmatter, dict) and frontmatter.get('notebook') is True:
+                    # Check if the specified frontmatter field is true
+                    if frontmatter and isinstance(frontmatter, dict) and frontmatter.get(FRONTMATTER_FIELD) is True:
                         files_to_convert.append(file_path)
                 except yaml.YAMLError:
                     print(f"Error parsing frontmatter in {file_path}")
@@ -196,7 +196,7 @@ def commit_changes(files: List[str]):
         return
         
     # Configure git
-    set_email = f'git config --local user.email "{GITHUB_USER_ID}+{GITHUB_ACTOR}@@users.noreply.github.com"'
+    set_email = f'git config --local user.email "{GITHUB_ACTOR}@users.noreply.github.com"'
     set_user = f'git config --local user.name "{GITHUB_ACTOR}"'
     sp.call(set_email, shell=True)
     sp.call(set_user, shell=True)
