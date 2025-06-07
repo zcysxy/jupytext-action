@@ -80,13 +80,13 @@ def prepare_command(input_file: str, output_file: str) -> str:
     # Determine the conversion direction
     if INPUT_EXT == 'ipynb' and OUTPUT_EXT != 'ipynb':
         # Converting from notebook to text
-        command += f" --to {OUTPUT_FORMAT} {input_file} -o {output_file}"
+        command += f' --to {OUTPUT_FORMAT} "{input_file}" -o "{output_file}"'
     elif INPUT_EXT != 'ipynb' and OUTPUT_EXT == 'ipynb':
         # Converting from text to notebook
-        command += f" --to notebook {input_file} -o {output_file}"
+        command += f' --to notebook "{input_file}" -o "{output_file}"'
     else:
         # Converting between text formats
-        command += f" --to {OUTPUT_FORMAT} {input_file} -o {output_file}"
+        command += f' --to {OUTPUT_FORMAT} "{input_file}" -o "{output_file}"'
         
     return command
 
@@ -100,6 +100,7 @@ def get_all_files() -> List[str]:
 
 def get_modified_files() -> List[str]:
     """Get list of modified files in the current commit within the input directory."""
+    sp.call('git config --global --add safe.directory /github/workspace', shell=True)
     cmd = 'git diff-tree --no-commit-id --name-only -r HEAD'
     committed_files = sp.getoutput(cmd).split('\n')
     
@@ -121,11 +122,14 @@ def get_files_with_frontmatter() -> List[str]:
         return []
     
     # First, get all modified files
+    sp.call('git config --global --add safe.directory /github/workspace', shell=True)
     cmd = 'git diff-tree --no-commit-id --name-only -r HEAD'
     committed_files = sp.getoutput(cmd).split('\n')
+    # print(committed_files)
     
     # Filter for markdown files in the input directory
     input_dir_path = os.path.normpath(INPUT_DIRECTORY)
+    print(input_dir_path)
     modified_md_files = [file for file in committed_files if (
         file.endswith(f'.{INPUT_EXT}') and 
         os.path.isfile(file) and
@@ -133,6 +137,7 @@ def get_files_with_frontmatter() -> List[str]:
     )]
     
     files_to_convert = []
+    # print(f"Checking {len(modified_md_files)} modified Markdown files for frontmatter field '{FRONTMATTER_FIELD}' with value '{FRONTMATTER_VALUE}'")
     
     for file_path in modified_md_files:
         try:
@@ -149,6 +154,7 @@ def get_files_with_frontmatter() -> List[str]:
                     try:
                         if frontmatter_text.strip().startswith('{') and frontmatter_text.strip().endswith('}'):
                             frontmatter = json.loads(frontmatter_text)
+                            # print(f"Parsed JSON frontmatter in {file_path}")
                         else:
                             # Parse the standard YAML frontmatter
                             frontmatter = yaml.safe_load(frontmatter_text)
@@ -159,9 +165,11 @@ def get_files_with_frontmatter() -> List[str]:
                     # Check if the specified frontmatter field has the specified value
                     if frontmatter and isinstance(frontmatter, dict):
                         field_value = frontmatter.get(FRONTMATTER_FIELD)
+                        # print(f"Found frontmatter field '{FRONTMATTER_FIELD}' with value '{field_value}' in {file_path}")
                         
                         # Convert expected value to appropriate type for comparison
                         expected_value = FRONTMATTER_VALUE
+                        # print(f"Comparing with expected value: {expected_value}")
                         if isinstance(expected_value, str):
                             if expected_value.lower() == 'true':
                                 expected_value = True
@@ -171,6 +179,7 @@ def get_files_with_frontmatter() -> List[str]:
                                 expected_value = int(expected_value)
                         
                         if field_value == expected_value:
+                            # print(f"File {file_path} has frontmatter field '{FRONTMATTER_FIELD}' with value '{FRONTMATTER_VALUE}'. Adding to conversion list.")
                             files_to_convert.append(file_path)
                 except (yaml.YAMLError, json.JSONDecodeError) as e:
                     print(f"Error parsing frontmatter in {file_path}: {e}")
@@ -186,17 +195,35 @@ def convert_files(files: List[str]) -> List[str]:
     for input_file in files:
         # Create output directory if it doesn't exist
         input_dir, input_name = os.path.split(input_file)
+        
         # Strip INPUT_DIRECTORY from input_dir if it is set
         if INPUT_DIRECTORY and INPUT_DIRECTORY != './':
             input_dir = os.path.relpath(input_dir, INPUT_DIRECTORY)
-        output_dir = os.path.join(OUTPUT_DIR, input_dir) if OUTPUT_DIR != './' else input_dir
+            # Normalize the relative path to remove './' at the beginning
+            if input_dir == '.':
+                input_dir = ''
         
-        if not os.path.exists(output_dir) and output_dir:
+        # Handle OUTPUT_DIR correctly to avoid double './'
+        if OUTPUT_DIR == './':
+            output_dir = input_dir if input_dir else '.'
+        else:
+            # Remove trailing slash from OUTPUT_DIR if present
+            clean_output_dir = OUTPUT_DIR.rstrip('/')
+            output_dir = os.path.join(clean_output_dir, input_dir) if input_dir else clean_output_dir
+        
+        # Create directory if needed and it's not empty
+        if output_dir and output_dir != '.' and not os.path.exists(output_dir):
             sp.call(f'mkdir -p {output_dir}', shell=True)
         
         # Determine output filename
         base_name = os.path.splitext(input_name)[0]
-        output_file = os.path.join(output_dir, f"{base_name}.{OUTPUT_EXT}")
+        
+        # If output_dir is empty or '.', don't use os.path.join
+        if not output_dir or output_dir == '.':
+            output_file = f"{base_name}.{OUTPUT_EXT}"
+        else:
+            output_file = os.path.join(output_dir, f"{base_name}.{OUTPUT_EXT}")
+            
         output_files.append(output_file)
         
         # Prepare and run command
@@ -255,7 +282,7 @@ def commit_changes(files: List[str]):
     file_list = ' '.join(set(files))
     
     # Commit changes - remove the checkout command as it might cause issues
-    git_add = f'git add {file_list}'
+    git_add = f'git add .'
     git_commit = f'git commit -m "{COMMIT_MESSAGE}"'
     
     print(f'Committing {file_list}...')
@@ -274,12 +301,21 @@ def commit_changes(files: List[str]):
         return False
 
 
-def push_changes():
+def push_changes(commit_successful=True):
     """Pushes commit."""
+    if not commit_successful:
+        print("No changes to push")
+        return
+        
     set_url = f'git remote set-url origin https://x-access-token:{GITHUB_TOKEN}@github.com/{TARGET_REPOSITORY}'
     git_push = f'git push origin {TARGET_BRANCH}'
-    sp.call(set_url, shell=True)
-    sp.call(git_push, shell=True)
+    
+    try:
+        sp.check_call(set_url, shell=True)
+        sp.check_call(git_push, shell=True)
+        print("Successfully pushed changes")
+    except sp.CalledProcessError as e:
+        print(f"Failed to push changes: {e}")
 
 
 def main():
