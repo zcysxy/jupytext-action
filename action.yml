@@ -37,6 +37,11 @@ inputs:
     required: false
     default: "notebook"
 
+  frontmatter_value:
+    description: "Value of the frontmatter field to check (for check=frontmatter)"
+    required: false
+    default: "true"
+
   comment_magics:
     description: "Comment out Jupyter magic commands"
     required: false
