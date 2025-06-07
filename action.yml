@@ -33,6 +33,11 @@ inputs:
     required: false
     default: "notebook"
 
+  disable_git_commit:
+    description: "Disable Git commit after conversion (useful for GitHub releases)"
+    required: false
+    default: "false"
+
   comment_magics:
     description: "Whether to comment magic commands"
     required: false

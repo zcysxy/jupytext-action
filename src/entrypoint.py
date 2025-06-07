@@ -34,6 +34,7 @@ COMMENT_MAGICS = os.environ.get('INPUT_COMMENT_MAGICS', '') or 'false' # 'true' 
 SPLIT_AT_HEADING = os.environ.get('INPUT_SPLIT_AT_HEADING', '') or 'false'  # 'true' | 'false'
 SYNC_MODE = os.environ['INPUT_SYNC_MODE'] or 'one-way'  # 'one-way' | 'two-way'
 FRONTMATTER_FIELD = os.environ.get('INPUT_FRONTMATTER_FIELD', '') or 'notebook'  # Field name in frontmatter to check
+DISABLE_GIT_COMMIT = os.environ.get('INPUT_DISABLE_GIT_COMMIT', '') or 'false'  # Whether to disable Git commit
 
 # Format specifications
 INPUT_FORMAT = os.environ['INPUT_INPUT_FORMAT'] or 'md'  # ipynb, py, md, R, etc.
@@ -260,14 +261,20 @@ def main():
     if SYNC_MODE == 'two-way':
         sync_changes(input_files, output_files)
         
-    # Commit and push changes if any files were converted
+    # Commit and push changes if any files were converted and git commit is not disabled
     if output_files:
-        files_to_commit = output_files
-        if SYNC_MODE == 'two-way':
-            files_to_commit.extend(input_files)  # Also commit input files in two-way mode
-            
-        commit_changes(files_to_commit)
-        push_changes()
+        if DISABLE_GIT_COMMIT.lower() == 'true':
+            print("Git commit disabled. Files were converted but not committed.")
+            # List the output files for reference
+            for file in output_files:
+                print(f"- {file}")
+        else:
+            files_to_commit = output_files
+            if SYNC_MODE == 'two-way':
+                files_to_commit.extend(input_files)  # Also commit input files in two-way mode
+                
+            commit_changes(files_to_commit)
+            push_changes()
     else:
         print('No files were converted successfully.')
 
